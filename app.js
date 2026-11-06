@@ -105,6 +105,16 @@ function seedInitialData() {
   saveState();
 }
 
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&')
+    .replace(/</g, '<')
+    .replace(/>/g, '>')
+    .replace(/"/g, '"')
+    .replace(/'/g, '&#39;');
+}
+
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
 }
@@ -426,7 +436,7 @@ function renderAquariumConcept(dash) {
           <span class="label">${label}</span>
           <div class="num">${dayNums[i]}</div>
           <div style="display:flex; flex-direction:column; gap:0.25rem; margin-top:0.35rem; width:100%;">
-            ${dayActs.map(a => `<button class="badge ${isCompletedOnDate(a, dayDate) ? 'completed' : ''}" style="font-size:0.65rem; text-align:center; border:none; cursor:pointer;" onclick="showActivityOptions('${a.id}', '${dayDate.toISOString().slice(0,10)}')">${a.name}</button>`).join('')}
+            ${dayActs.map(a => `<button class="badge ${isCompletedOnDate(a, dayDate) ? 'completed' : ''}" style="font-size:0.65rem; text-align:center; border:none; cursor:pointer;" onclick="showActivityOptions('${a.id}', '${dayDate.toISOString().slice(0,10)}')">${escapeHtml(a.name)}</button>`).join('')}
             <button class="badge" style="font-size:0.65rem; text-align:center; border:none; cursor:pointer; opacity:0.7;" onclick="showAddActivityForDay('${dayDate.toISOString().slice(0,10)}')">+</button>
           </div>
         </div>`;
@@ -571,7 +581,7 @@ function renderWidget(dash, widget, idx) {
         content += `<button class="btn-small" onclick="addLightingWindow()">+ Add Window</button>
           <button class="btn" style="margin-top:0.75rem" onclick="saveWidget('${widget.id}')">Save</button>`;
       } else {
-        content = lights.map(l => `<div style="margin-bottom:0.4rem"><strong>${l.window}:</strong> ${l.on} – ${l.off} (${l.intensity})</div>`).join('') || '<div class="empty-state">No lighting windows</div>';
+        content = lights.map(l => `<div style="margin-bottom:0.4rem"><strong>${escapeHtml(l.window)}:</strong> ${l.on} – ${l.off} (${escapeHtml(l.intensity)})</div>`).join('') || '<div class="empty-state">No lighting windows</div>';
       }
       break;
 
