@@ -205,12 +205,16 @@ async function saveToSupabase() {
   if (!currentUser) return;
   const toSave = { ...state };
   toSave.calendarDate = toSave.calendarDate.toISOString();
-  const { data: existing } = await sb.from('dashboards').select('id').eq('user_id', currentUser.id).maybeSingle();
+  const { data: existing, error: selErr } = await sb.from('dashboards').select('id').eq('user_id', currentUser.id).maybeSingle();
+  if (selErr) { console.error('Select error', selErr); return; }
+  let res;
   if (existing) {
-    await sb.from('dashboards').update({ data: toSave, updated_at: new Date().toISOString() }).eq('user_id', currentUser.id);
+    res = await sb.from('dashboards').update({ data: toSave, updated_at: new Date().toISOString() }).eq('user_id', currentUser.id);
   } else {
-    await sb.from('dashboards').insert({ user_id: currentUser.id, data: toSave });
+    res = await sb.from('dashboards').insert({ user_id: currentUser.id, data: toSave });
   }
+  if (res.error) console.error('Save error', res.error);
+  else console.log('Saved to Supabase');
 }
 
 async function logout() {
