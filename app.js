@@ -538,6 +538,10 @@ function renderLightingChart(dash) {
     }
   }
 
+  // Calculate max intensity rounded up to nearest 10
+  const maxIntensity = Math.max(...lights.map(l => parseInt(l.intensity) || 0), 10);
+  const yMax = Math.ceil(maxIntensity / 10) * 10;
+
   charts['lighting'] = new Chart(ctx, {
     type: 'line',
     data: {
@@ -564,7 +568,7 @@ function renderLightingChart(dash) {
         },
         y: {
           beginAtZero: true,
-          max: 100,
+          max: yMax,
           title: { display: true, text: 'Light %' }
         }
       }
