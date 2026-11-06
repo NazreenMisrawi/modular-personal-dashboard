@@ -4,7 +4,7 @@
 const STORAGE_KEY = 'modularDashboardData_v1';
 const SUPABASE_URL = 'https://lmkovkianhwzjgaajxca.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__IPAAWNqWmoMftlvy35sHQ_DFSTSWgB';
-const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 let currentUser = null;
 
@@ -116,9 +116,9 @@ function applyTheme() {
 
 // ===== AUTH & SUPABASE =====
 async function initAuth() {
-  if (!supabase) { showLogin(); return; }
+  if (!sb) { showLogin(); return; }
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await sb.auth.getSession();
     if (session) {
       currentUser = session.user;
       await loadFromSupabase();
@@ -148,7 +148,7 @@ function showLogin() {
 async function doLogin() {
   const email = document.getElementById('auth-email').value;
   const password = document.getElementById('auth-password').value;
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) alert(error.message);
   else location.reload();
 }
@@ -156,14 +156,14 @@ async function doLogin() {
 async function doSignup() {
   const email = document.getElementById('auth-email').value;
   const password = document.getElementById('auth-password').value;
-  const { error } = await supabase.auth.signUp({ email, password });
+  const { error } = await sb.auth.signUp({ email, password });
   if (error) alert(error.message);
   else alert('Account created. You can now log in.');
 }
 
 async function loadFromSupabase() {
   if (!currentUser) return;
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('dashboards')
     .select('data')
     .eq('user_id', currentUser.id)
@@ -182,7 +182,7 @@ async function saveToSupabase() {
   if (!currentUser) return;
   const toSave = { ...state };
   toSave.calendarDate = toSave.calendarDate.toISOString();
-  await supabase.from('dashboards').upsert({
+  await sb.from('dashboards').upsert({
     user_id: currentUser.id,
     data: toSave,
     updated_at: new Date().toISOString()
@@ -190,7 +190,7 @@ async function saveToSupabase() {
 }
 
 async function logout() {
-  await supabase.auth.signOut();
+  await sb.auth.signOut();
   currentUser = null;
   location.reload();
 }
