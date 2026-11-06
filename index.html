@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modular Personal Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <h2>Dashboard</h2>
+        <button id="sidebar-toggle" class="icon-btn mobile-only">☰</button>
+      </div>
+      <nav id="nav">
+        <a href="javascript:void(0)" data-view="home" class="nav-item active">🏠 Home / Overview</a>
+        <a href="javascript:void(0)" data-view="dashboards" class="nav-item">📊 My Dashboards</a>
+        <a href="javascript:void(0)" data-view="calendar" class="nav-item">📅 Global Calendar</a>
+        <a href="javascript:void(0)" data-view="activities" class="nav-item">✅ All Activities</a>
+        <a href="javascript:void(0)" data-view="settings" class="nav-item">⚙️ Settings</a>
+        <a href="javascript:void(0)" id="create-dashboard-btn" class="nav-item create">+ Create Dashboard</a>
+      </nav>
+    </aside>
+    <main id="main-content">
+      <!-- Views rendered here -->
+    </main>
+  </div>
+
+  <!-- Modals -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div id="modal" class="modal">
+      <div class="modal-header">
+        <h3 id="modal-title">Modal</h3>
+        <button id="modal-close" class="icon-btn">×</button>
+      </div>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
