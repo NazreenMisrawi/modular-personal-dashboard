@@ -189,21 +189,14 @@ async function loadFromSupabase() {
   if (data?.data && data.data.dashboards?.length) {
     state = { ...state, ...data.data };
     state.calendarDate = new Date(state.calendarDate || Date.now());
-  } else if (!error) {
-    // Try migrate from localStorage first
-    const local = localStorage.getItem(STORAGE_KEY);
-    let migrated = false;
-    if (local) {
-      try {
-        const parsed = JSON.parse(local);
-        if (parsed.dashboards?.length) {
-          state = { ...state, ...parsed };
-          state.calendarDate = new Date(state.calendarDate || Date.now());
-          migrated = true;
-        }
-      } catch (e) { console.error('Migration parse failed', e); }
-    }
-    if (!migrated && !state.dashboards.length) seedInitialData();
+  } else {
+    // No cloud data yet — seed the aquarium dashboard
+    if (!state.dashboards.length) seedInitialData();
+    await saveToSupabase();
+  }
+  // Always ensure aquarium exists
+  if (!state.dashboards.some(d => d.name.toLowerCase().includes('aquarium'))) {
+    seedInitialData();
     await saveToSupabase();
   }
 }
@@ -212,11 +205,12 @@ async function saveToSupabase() {
   if (!currentUser) return;
   const toSave = { ...state };
   toSave.calendarDate = toSave.calendarDate.toISOString();
-  await sb.from('dashboards').upsert({
-    user_id: currentUser.id,
-    data: toSave,
-    updated_at: new Date().toISOString()
-  }, { onConflict: 'user_id' });
+  const { data: existing } = await sb.from('dashboards').select('id').eq('user_id', currentUser.id).maybeSingle();
+  if (existing) {
+    await sb.from('dashboards').update({ data: toSave, updated_at: new Date().toISOString() }).eq('user_id', currentUser.id);
+  } else {
+    await sb.from('dashboards').insert({ user_id: currentUser.id, data: toSave });
+  }
 }
 
 async function logout() {
