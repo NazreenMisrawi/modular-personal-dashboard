@@ -289,12 +289,23 @@ function renderAquariumConcept(dash) {
 
     <div class="section-title">This week's activities</div>
     <div class="week-days">
-      ${days.map((label, i) => `
-        <div class="day-circle ${i === todayIdx ? 'today' : ''}">
+      ${days.map((label, i) => {
+        const dayDate = new Date(weekStart);
+        dayDate.setDate(weekStart.getDate() + i);
+        const dayActs = dash.activities.filter(a => {
+          if (a.recurrence === 'daily') return true;
+          if (a.recurrence === 'alternate') return (dayDate.getDate() % 2 === 0);
+          if (a.recurrence === 'weekly') return dayDate.getDay() === 0;
+          return false;
+        });
+        return `<div class="day-circle ${i === todayIdx ? 'today' : ''}">
           <span class="label">${label}</span>
           <div class="num">${dayNums[i]}</div>
-        </div>
-      `).join('')}
+          <div style="display:flex; flex-direction:column; gap:0.25rem; margin-top:0.35rem; width:100%;">
+            ${dayActs.map(a => `<span class="badge" style="font-size:0.65rem; text-align:center;">${a.name}</span>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}
     </div>
 
     <div class="upcoming-card">
@@ -366,8 +377,8 @@ function renderWidget(dash, widget, idx) {
   const header = `<div class="widget-header"><h3>${getWidgetTitle(widget)}</h3>
     <div style="display:flex; gap:0.25rem; align-items:center;">
       ${!editing ? `<button class="btn-small" onclick="toggleEditWidget('${widget.id}')">Edit</button>` : ''}
-      <button class="icon-btn" onclick="moveWidget(${idx}, -1)">↑</button>
-      <button class="icon-btn" onclick="moveWidget(${idx}, 1)">↓</button>
+      <button class="icon-btn" onclick="moveWidget('${widget.id}', -1)">↑</button>
+      <button class="icon-btn" onclick="moveWidget('${widget.id}', 1)">↓</button>
       <button class="icon-btn" onclick="removeWidget('${widget.id}')">×</button>
     </div></div>`;
 
@@ -406,6 +417,7 @@ function renderWidget(dash, widget, idx) {
             <select onchange="updateActivity('${a.id}', 'recurrence', this.value)">
               <option value="" ${!a.recurrence?'selected':''}>None</option>
               <option value="daily" ${a.recurrence==='daily'?'selected':''}>Daily</option>
+              <option value="alternate" ${a.recurrence==='alternate'?'selected':''}>Alternate days</option>
               <option value="weekly" ${a.recurrence==='weekly'?'selected':''}>Weekly</option>
               <option value="monthly" ${a.recurrence==='monthly'?'selected':''}>Monthly</option>
             </select>
@@ -418,7 +430,7 @@ function renderWidget(dash, widget, idx) {
         content = dash.activities.map(a => `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem">
             <span>${a.name} (${a.recurrence || 'once'})</span>
-            <button class="btn-small" onclick="completeActivity('${a.id}')">Complete</button>
+            <button class="btn-small" onclick="completeActivity('${a.id}')">Complete Task</button>
           </div>
         `).join('') || '<div class="empty-state">No activities</div>';
       }
@@ -476,6 +488,16 @@ function renderWidget(dash, widget, idx) {
     case 'chart':
       const metric = dash.metrics.find(m => m.name === widget.metricName);
       content = metric && metric.history.length ? `<div class="chart-container"><canvas id="chart-${widget.id}"></canvas></div>` : '<div class="empty-state">No data recorded</div>';
+      if (editing) content += `<button class="btn" style="margin-top:0.75rem" onclick="saveWidget('${widget.id}')">Save</button>`;
+      break;
+
+    case 'water-test':
+      if (editing) {
+        content = `<p style="color:var(--text-muted);margin-bottom:0.75rem;">Water testing form is always available. Click Save to exit edit mode.</p>
+          <button class="btn" onclick="saveWidget('${widget.id}')">Save</button>`;
+      } else {
+        content = `<button class="btn" onclick="showWaterTestModal()">Log Water Test</button>`;
+      }
       break;
 
     default:
@@ -578,7 +600,7 @@ function renderActivities(container) {
       <div class="card">
         <span class="color-dot" style="background:${a.dashboardColor}"></span>
         <strong>${a.name}</strong> (${a.dashboardName}) — ${a.recurrence || 'one-time'}
-        <button class="btn-small" style="float:right" onclick="completeActivity('${a.id}', '${a.dashboardId}')">Complete</button>
+        <button class="btn-small" style="float:right" onclick="completeActivity('${a.id}', '${a.dashboardId}')">Complete Task</button>
       </div>
     `).join('') || '<div class="empty-state">No activities</div>'}
   `;
@@ -811,7 +833,7 @@ function showAddActivity() {
   showModal('Add Activity', `
     <div class="form-group"><label>Name</label><input id="a-name"></div>
     <div class="form-group"><label>Recurrence</label>
-      <select id="a-rec"><option value="">None</option><option>daily</option><option>weekly</option><option>monthly</option></select>
+      <select id="a-rec"><option value="">None</option><option>daily</option><option>alternate</option><option>weekly</option><option>monthly</option></select>
     </div>
     <button class="btn" onclick="addActivity()">Add</button>
   `);
@@ -873,8 +895,11 @@ function removeWidget(id) {
   render();
 }
 
-function moveWidget(idx, dir) {
+function moveWidget(widgetId, dir) {
   const dash = getCurrentDash();
+  if (!dash) return;
+  const idx = dash.widgets.findIndex(w => w.id === widgetId);
+  if (idx === -1) return;
   const newIdx = idx + dir;
   if (newIdx >= 0 && newIdx < dash.widgets.length) {
     [dash.widgets[idx], dash.widgets[newIdx]] = [dash.widgets[newIdx], dash.widgets[idx]];
@@ -1018,6 +1043,7 @@ function calculateNext(act) {
   const last = act.history.length ? new Date(act.history[act.history.length-1].date) : new Date();
   const next = new Date(last);
   if (act.recurrence === 'daily') next.setDate(next.getDate() + 1);
+  else if (act.recurrence === 'alternate') next.setDate(next.getDate() + 2);
   else if (act.recurrence === 'weekly') next.setDate(next.getDate() + 7);
   else if (act.recurrence === 'monthly') next.setMonth(next.getMonth() + 1);
   return next;
@@ -1039,6 +1065,7 @@ function getEventsForRange(start, end) {
           dashboardId: dash.id
         });
         if (act.recurrence === 'daily') d.setDate(d.getDate() + 1);
+        else if (act.recurrence === 'alternate') d.setDate(d.getDate() + 2);
         else if (act.recurrence === 'weekly') d.setDate(d.getDate() + 7);
         else break;
       }
