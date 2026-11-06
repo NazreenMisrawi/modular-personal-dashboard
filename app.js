@@ -168,11 +168,24 @@ async function loadFromSupabase() {
     .select('data')
     .eq('user_id', currentUser.id)
     .maybeSingle();
-  if (data?.data) {
+  if (data?.data && data.data.dashboards?.length) {
     state = { ...state, ...data.data };
     state.calendarDate = new Date(state.calendarDate || Date.now());
   } else if (!error) {
-    // First login: seed if empty
+    // First login: migrate from localStorage if present
+    const local = localStorage.getItem(STORAGE_KEY);
+    if (local) {
+      try {
+        const parsed = JSON.parse(local);
+        if (parsed.dashboards?.length) {
+          state = { ...state, ...parsed };
+          state.calendarDate = new Date(state.calendarDate || Date.now());
+          await saveToSupabase();
+          console.log('Migrated local data to Supabase');
+          return;
+        }
+      } catch (e) { console.error('Migration parse failed', e); }
+    }
     if (!state.dashboards.length) seedInitialData();
     await saveToSupabase();
   }
