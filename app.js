@@ -122,6 +122,7 @@ async function initAuth() {
     if (session) {
       currentUser = session.user;
       await loadFromSupabase();
+      updateUserProfile();
       render();
     } else {
       showLogin();
@@ -130,6 +131,25 @@ async function initAuth() {
     console.error('Auth init failed', err);
     showLogin();
   }
+}
+
+function updateUserProfile() {
+  const el = document.getElementById('user-profile');
+  const emailEl = document.getElementById('user-email');
+  if (el && currentUser) {
+    el.style.display = 'flex';
+    emailEl.textContent = currentUser.email || 'User';
+  }
+}
+
+function showProfileMenu() {
+  showModal('Profile', `
+    <p style="margin-bottom:1rem;"><strong>${currentUser?.email || 'User'}</strong></p>
+    <div style="display:flex; gap:0.5rem;">
+      <button class="btn-secondary btn" onclick="closeModal()">Close</button>
+      <button class="btn" onclick="logout()">Log out</button>
+    </div>
+  `);
 }
 
 function showLogin() {
@@ -172,21 +192,20 @@ async function loadFromSupabase() {
     state = { ...state, ...data.data };
     state.calendarDate = new Date(state.calendarDate || Date.now());
   } else if (!error) {
-    // First login: migrate from localStorage if present
+    // Try migrate from localStorage first
     const local = localStorage.getItem(STORAGE_KEY);
+    let migrated = false;
     if (local) {
       try {
         const parsed = JSON.parse(local);
         if (parsed.dashboards?.length) {
           state = { ...state, ...parsed };
           state.calendarDate = new Date(state.calendarDate || Date.now());
-          await saveToSupabase();
-          console.log('Migrated local data to Supabase');
-          return;
+          migrated = true;
         }
       } catch (e) { console.error('Migration parse failed', e); }
     }
-    if (!state.dashboards.length) seedInitialData();
+    if (!migrated && !state.dashboards.length) seedInitialData();
     await saveToSupabase();
   }
 }
