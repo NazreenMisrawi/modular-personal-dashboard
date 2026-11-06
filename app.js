@@ -1,7 +1,12 @@
 // Modular Personal Dashboard Application
-// Persistent storage via localStorage. Architecture ready for backend.
+// Persistent storage via localStorage + Supabase (per-user).
 
 const STORAGE_KEY = 'modularDashboardData_v1';
+const SUPABASE_URL = 'https://lmkovkianhwzjgaajxca.supabase.co';
+const SUPABASE_KEY = 'sb_publishable__IPAAWNqWmoMftlvy35sHQ_DFSTSWgB';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
 
 let state = {
   theme: 'dark',
@@ -38,6 +43,7 @@ function saveState() {
     const toSave = { ...state };
     toSave.calendarDate = toSave.calendarDate.toISOString();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    if (currentUser) saveToSupabase();
   } catch (e) {
     console.error('Save failed', e);
   }
@@ -106,6 +112,81 @@ function generateId() {
 
 function applyTheme() {
   document.documentElement.setAttribute('data-theme', state.theme);
+}
+
+// ===== AUTH & SUPABASE =====
+async function initAuth() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    await loadFromSupabase();
+    render();
+  } else {
+    showLogin();
+  }
+}
+
+function showLogin() {
+  document.getElementById('main-content').innerHTML = `
+    <div class="card" style="max-width:400px; margin:4rem auto;">
+      <h2>Login</h2>
+      <div class="form-group"><label>Email</label><input id="auth-email" type="email"></div>
+      <div class="form-group"><label>Password</label><input id="auth-password" type="password"></div>
+      <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+        <button class="btn" onclick="doLogin()">Login</button>
+        <button class="btn-secondary btn" onclick="doSignup()">Sign up</button>
+      </div>
+    </div>`;
+}
+
+async function doLogin() {
+  const email = document.getElementById('auth-email').value;
+  const password = document.getElementById('auth-password').value;
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) alert(error.message);
+  else location.reload();
+}
+
+async function doSignup() {
+  const email = document.getElementById('auth-email').value;
+  const password = document.getElementById('auth-password').value;
+  const { error } = await supabase.auth.signUp({ email, password });
+  if (error) alert(error.message);
+  else alert('Account created. You can now log in.');
+}
+
+async function loadFromSupabase() {
+  if (!currentUser) return;
+  const { data, error } = await supabase
+    .from('dashboards')
+    .select('data')
+    .eq('user_id', currentUser.id)
+    .maybeSingle();
+  if (data?.data) {
+    state = { ...state, ...data.data };
+    state.calendarDate = new Date(state.calendarDate || Date.now());
+  } else if (!error) {
+    // First login: seed if empty
+    if (!state.dashboards.length) seedInitialData();
+    await saveToSupabase();
+  }
+}
+
+async function saveToSupabase() {
+  if (!currentUser) return;
+  const toSave = { ...state };
+  toSave.calendarDate = toSave.calendarDate.toISOString();
+  await supabase.from('dashboards').upsert({
+    user_id: currentUser.id,
+    data: toSave,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'user_id' });
+}
+
+async function logout() {
+  await supabase.auth.signOut();
+  currentUser = null;
+  location.reload();
 }
 
 // ===== RENDER =====
@@ -1238,8 +1319,7 @@ function closeModal() {
 
 // Init
 document.addEventListener('DOMContentLoaded', () => {
-  loadState();
-  render();
+  initAuth();
 
   // Nav - more robust handling
   document.getElementById('nav').addEventListener('click', e => {
