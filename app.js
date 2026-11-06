@@ -316,7 +316,8 @@ function renderAquariumConcept(dash) {
           <span class="label">${label}</span>
           <div class="num">${dayNums[i]}</div>
           <div style="display:flex; flex-direction:column; gap:0.25rem; margin-top:0.35rem; width:100%;">
-            ${dayActs.map(a => `<span class="badge ${isCompletedToday(a) ? 'completed' : ''}" style="font-size:0.65rem; text-align:center;">${a.name}</span>`).join('')}
+            ${dayActs.map(a => `<button class="badge ${isCompletedOnDate(a, dayDate) ? 'completed' : ''}" style="font-size:0.65rem; text-align:center; border:none; cursor:pointer;" onclick="showActivityOptions('${a.id}', '${dayDate.toISOString().slice(0,10)}')">${a.name}</button>`).join('')}
+            <button class="badge" style="font-size:0.65rem; text-align:center; border:none; cursor:pointer; opacity:0.7;" onclick="showAddActivityForDay('${dayDate.toISOString().slice(0,10)}')">+</button>
           </div>
         </div>`;
       }).join('')}
@@ -380,7 +381,7 @@ function getWidgetTitle(w) {
     config: 'Equipment Config',
     'metrics-overview': 'Metrics',
     'water-test': 'Water Testing',
-    activities: 'Schedules & Tasks',
+    activities: "Today's Schedule",
     chart: w.metricName + ' Chart',
     'co2-schedule': 'CO2 Schedule',
     'lighting-schedule': 'Lighting Schedule'
@@ -392,7 +393,7 @@ function renderWidget(dash, widget, idx) {
   const editing = isEditing(widget.id);
   const header = `<div class="widget-header"><h3>${getWidgetTitle(widget)}</h3>
     <div style="display:flex; gap:0.25rem; align-items:center;">
-      ${!editing ? `<button class="btn-small" onclick="toggleEditWidget('${widget.id}')">Edit</button>` : ''}
+      ${!editing && widget.type !== 'activities' ? `<button class="btn-small" onclick="toggleEditWidget('${widget.id}')">Edit</button>` : ''}
       <button class="icon-btn" onclick="moveWidget('${widget.id}', -1)">↑</button>
       <button class="icon-btn" onclick="moveWidget('${widget.id}', 1)">↓</button>
       <button class="icon-btn" onclick="removeWidget('${widget.id}')">×</button>
@@ -426,30 +427,18 @@ function renderWidget(dash, widget, idx) {
       break;
 
     case 'activities':
-      if (editing) {
-        content = dash.activities.map(a => `
-          <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem;">
-            <input style="flex:1" value="${a.name}" onchange="updateActivity('${a.id}', 'name', this.value)">
-            <select onchange="updateActivity('${a.id}', 'recurrence', this.value)">
-              <option value="" ${!a.recurrence?'selected':''}>None</option>
-              <option value="daily" ${a.recurrence==='daily'?'selected':''}>Daily</option>
-              <option value="alternate" ${a.recurrence==='alternate'?'selected':''}>Alternate days</option>
-              <option value="weekly" ${a.recurrence==='weekly'?'selected':''}>Weekly</option>
-              <option value="monthly" ${a.recurrence==='monthly'?'selected':''}>Monthly</option>
-            </select>
-            <button class="btn-small btn-danger" onclick="removeActivity('${a.id}')">Remove</button>
-          </div>
-        `).join('') || '<div class="empty-state">No activities</div>';
-        content += `<button class="btn-small" onclick="showAddActivity()">+ Add Activity</button>
-          <button class="btn" style="margin-top:0.75rem" onclick="saveWidget('${widget.id}')">Save</button>`;
-      } else {
-        content = dash.activities.map(a => `
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem">
-            <span>${a.name} (${a.recurrence || 'once'})</span>
-            <button class="btn-small ${isCompletedToday(a) ? 'completed' : ''}" onclick="completeActivity('${a.id}')">${isCompletedToday(a) ? 'Task Completed' : 'Complete Task'}</button>
-          </div>
-        `).join('') || '<div class="empty-state">No activities</div>';
-      }
+      const todayActs = dash.activities.filter(a => {
+        if (a.recurrence === 'daily') return true;
+        if (a.recurrence === 'alternate') return (new Date().getDate() % 2 === 0);
+        if (a.recurrence === 'weekly') return new Date().getDay() === 0;
+        return false;
+      });
+      content = todayActs.map(a => `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem">
+          <span>${a.name}</span>
+          <span class="badge ${isCompletedToday(a) ? 'completed' : ''}">${isCompletedToday(a) ? 'Completed' : 'Not completed'}</span>
+        </div>
+      `).join('') || '<div class="empty-state">No activities for today</div>';
       break;
 
     case 'lighting-schedule':
@@ -867,9 +856,77 @@ function completeActivity(id, dashId) {
   }
 }
 
+function showActivityOptions(activityId, dateStr) {
+  const dash = getCurrentDash();
+  if (!dash) return;
+  const act = dash.activities.find(a => a.id === activityId);
+  if (!act) return;
+  const completed = isCompletedOnDate(act, new Date(dateStr));
+  showModal(act.name, `
+    <p style="margin-bottom:1rem;">Date: ${dateStr}</p>
+    <div style="display:flex; gap:0.5rem;">
+      <button class="btn" onclick="completeActivityOnDate('${activityId}', '${dateStr}'); closeModal();">${completed ? 'Already Completed' : 'Complete Task'}</button>
+      <button class="btn-secondary btn" onclick="resetActivityOnDate('${activityId}', '${dateStr}'); closeModal();">Reset</button>
+    </div>
+  `);
+}
+
+function showAddActivityForDay(dateStr) {
+  showModal('Add Activity', `
+    <div class="form-group"><label>Name</label><input id="a-name"></div>
+    <div class="form-group"><label>Recurrence</label>
+      <select id="a-rec"><option value="">None</option><option>daily</option><option>alternate</option><option>weekly</option><option>monthly</option></select>
+    </div>
+    <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+      <button class="btn" onclick="addActivityForDay('${dateStr}')">Add</button>
+      <button type="button" class="btn-secondary btn" onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+}
+
+function addActivityForDay(dateStr) {
+  const dash = getCurrentDash();
+  if (!dash) return;
+  dash.activities.push({
+    id: generateId(),
+    name: document.getElementById('a-name').value || 'New Activity',
+    recurrence: document.getElementById('a-rec').value || null,
+    history: []
+  });
+  saveState();
+  closeModal();
+  render();
+}
+
+function isCompletedOnDate(act, date) {
+  const dateStr = date.toISOString ? date.toISOString().slice(0, 10) : date;
+  return act.history.some(h => h.date.startsWith(dateStr) && h.completed);
+}
+
+function completeActivityOnDate(id, dateStr) {
+  const dash = getCurrentDash();
+  if (!dash) return;
+  const act = dash.activities.find(a => a.id === id);
+  if (act && !isCompletedOnDate(act, dateStr)) {
+    act.history.push({ date: dateStr + 'T12:00:00', completed: true });
+    saveState();
+    render();
+  }
+}
+
+function resetActivityOnDate(id, dateStr) {
+  const dash = getCurrentDash();
+  if (!dash) return;
+  const act = dash.activities.find(a => a.id === id);
+  if (act) {
+    act.history = act.history.filter(h => !h.date.startsWith(dateStr));
+    saveState();
+    render();
+  }
+}
+
 function isCompletedToday(act) {
-  const today = new Date().toISOString().slice(0, 10);
-  return act.history.some(h => h.date.startsWith(today) && h.completed);
+  return isCompletedOnDate(act, new Date());
 }
 
 function showAddMetric() {
