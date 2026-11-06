@@ -134,10 +134,8 @@ async function initAuth() {
 }
 
 function updateUserProfile() {
-  const el = document.getElementById('user-profile');
   const emailEl = document.getElementById('user-email');
-  if (el && currentUser) {
-    el.style.display = 'flex';
+  if (emailEl && currentUser) {
     emailEl.textContent = currentUser.email || 'User';
   }
 }
