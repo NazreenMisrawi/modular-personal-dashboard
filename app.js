@@ -529,29 +529,56 @@ function renderLightingChart(dash) {
   const lights = dash.config.lightingSchedule || [];
   if (!lights.length) return;
   if (charts['lighting']) charts['lighting'].destroy();
+
+  // Build 24-hour intensity curve (every 30 min)
+  const points = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      const timeStr = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+      const minutes = h * 60 + m;
+      let intensity = 0;
+      for (const l of lights) {
+        const [onH, onM] = l.on.split(':').map(Number);
+        const [offH, offM] = l.off.split(':').map(Number);
+        const onMin = onH * 60 + onM;
+        const offMin = offH * 60 + offM;
+        const pct = parseInt(l.intensity) || 0;
+        if (minutes >= onMin && minutes < offMin) intensity = Math.max(intensity, pct);
+      }
+      points.push({ time: timeStr, intensity });
+    }
+  }
+
   charts['lighting'] = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: lights.map(l => l.window),
+      labels: points.map(p => p.time),
       datasets: [{
-        label: 'Hours',
-        data: lights.map(l => {
-          const on = l.on.split(':').map(Number);
-          const off = l.off.split(':').map(Number);
-          return (off[0] + off[1]/60) - (on[0] + on[1]/60);
-        }),
+        label: 'Intensity %',
+        data: points.map(p => p.intensity),
         borderColor: '#26c6da',
         backgroundColor: 'rgba(38,198,218,0.15)',
-        tension: 0.3,
+        tension: 0.1,
         fill: true,
-        pointRadius: 4
+        pointRadius: 0,
+        borderWidth: 2
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, title: { display: true, text: 'Hours' } } }
+      scales: {
+        x: {
+          title: { display: true, text: 'Time' },
+          ticks: { maxTicksLimit: 8, callback: (val, idx) => points[idx]?.time.endsWith(':00') ? points[idx].time : '' }
+        },
+        y: {
+          beginAtZero: true,
+          max: 100,
+          title: { display: true, text: 'Light %' }
+        }
+      }
     }
   });
 }
