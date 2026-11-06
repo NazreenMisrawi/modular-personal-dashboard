@@ -246,15 +246,15 @@ th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--borde
 .color-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 0.5rem; }
 .mobile-menu-btn {
   position: fixed;
-  top: 1rem;
-  right: 1rem;
+  top: 0.75rem;
+  left: 0.75rem;
   z-index: 200;
   background: var(--accent-soft);
   color: var(--accent);
   border: none;
   border-radius: 20px;
-  padding: 0.5rem 0.75rem;
-  font-size: 1.2rem;
+  padding: 0.4rem 0.65rem;
+  font-size: 1.1rem;
   cursor: pointer;
   font-weight: 600;
 }
@@ -270,12 +270,22 @@ th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--borde
 }
 
 @media (max-width: 768px) {
-  .sidebar { position: fixed; height: 100%; transform: translateX(-100%); }
+  .sidebar { position: fixed; height: 100%; transform: translateX(-100%); z-index: 150; }
   .sidebar.open { transform: translateX(0); }
   .mobile-only { display: block; }
-  #main-content { padding: 1rem; }
+  #main-content { padding: 3.5rem 0.75rem 1rem; }
   .grid { grid-template-columns: 1fr; }
-  .metrics-row { grid-template-columns: 1fr 1fr; }
-  .week-days { gap: 0.25rem; }
-  .day-circle .num { width: 32px; height: 32px; font-size: 0.8rem; }
+  .metrics-row { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  .metric-card { padding: 0.75rem; }
+  .metric-card .value { font-size: 1.3rem; }
+  .week-days { gap: 0.15rem; }
+  .day-circle .num { width: 28px; height: 28px; font-size: 0.75rem; }
+  .day-circle .label { font-size: 0.6rem; }
+  .dashboard-header { flex-wrap: wrap; gap: 0.5rem; }
+  .dashboard-title { font-size: 1.2rem; }
+  .section-title { font-size: 1rem; margin: 1rem 0 0.5rem; }
+  .card { padding: 0.75rem; }
+  .chart-container { height: 140px; }
+  .upcoming-card { padding: 0.75rem; }
+  .btn, .btn-small { font-size: 0.75rem; padding: 0.3rem 0.6rem; }
 }
