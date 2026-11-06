@@ -43,10 +43,16 @@ function saveState() {
     const toSave = { ...state };
     toSave.calendarDate = toSave.calendarDate.toISOString();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
-    if (currentUser) saveToSupabase();
+    // Only save to Supabase when explicitly requested
   } catch (e) {
     console.error('Save failed', e);
   }
+}
+
+function saveAll() {
+  saveState();
+  saveToSupabase();
+  alert('Saved');
 }
 
 function seedInitialData() {
@@ -83,14 +89,7 @@ function seedInitialData() {
       { id: generateId(), name: 'Plant Condition', unit: '', type: 'text', category: 'Livestock', history: [] },
       { id: generateId(), name: 'Livestock Condition', unit: '', type: 'text', category: 'Livestock', history: [] }
     ],
-    activities: [
-      { id: generateId(), name: 'Lighting Schedule', type: 'schedule', recurrence: 'daily', timeOn: '08:00', timeOff: '20:00', history: [] },
-      { id: generateId(), name: 'CO2 Schedule', type: 'schedule', recurrence: 'daily', timeOn: '09:00', timeOff: '19:00', history: [] },
-      { id: generateId(), name: 'Feeding', type: 'task', recurrence: 'daily', history: [] },
-      { id: generateId(), name: 'Water Change', type: 'task', recurrence: 'weekly', history: [] },
-      { id: generateId(), name: 'Fertilisation', type: 'task', recurrence: 'weekly', history: [] },
-      { id: generateId(), name: 'Filter Cleaning', type: 'maintenance', recurrence: 'monthly', history: [] }
-    ],
+    activities: [],
     widgets: [
       { id: generateId(), type: 'config' },
       { id: generateId(), type: 'metrics-overview' },
@@ -419,6 +418,7 @@ function renderAquariumConcept(dash) {
         const dayActs = dash.activities.filter(a => {
           if (a.recurrence === 'daily') return true;
           if (a.recurrence === 'alternate') return (dayDate.getDate() % 2 === 0);
+          if (a.recurrence === 'every3') return (dayDate.getDate() % 3 === 0);
           if (a.recurrence === 'weekly') return dayDate.getDay() === 0;
           return false;
         });
@@ -540,6 +540,7 @@ function renderWidget(dash, widget, idx) {
       const todayActs = dash.activities.filter(a => {
         if (a.recurrence === 'daily') return true;
         if (a.recurrence === 'alternate') return (new Date().getDate() % 2 === 0);
+        if (a.recurrence === 'every3') return (new Date().getDate() % 3 === 0);
         if (a.recurrence === 'weekly') return new Date().getDay() === 0;
         return false;
       });
@@ -987,9 +988,23 @@ function showActivityOptions(activityId, dateStr) {
 
 function showAddActivityForDay(dateStr) {
   showModal('Add Activity', `
-    <div class="form-group"><label>Name</label><input id="a-name"></div>
-    <div class="form-group"><label>Recurrence</label>
-      <select id="a-rec"><option value="">None</option><option>daily</option><option>alternate</option><option>weekly</option><option>monthly</option></select>
+    <div class="form-group"><label>Activity</label>
+      <select id="a-name">
+        <option>Feeding</option>
+        <option>Filter cleaning</option>
+        <option>Water change</option>
+        <option>Fertilisation</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Frequency (optional)</label>
+      <select id="a-rec">
+        <option value="">One-off</option>
+        <option value="daily">Daily</option>
+        <option value="alternate">Alternate days</option>
+        <option value="every3">Once every 3 days</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+      </select>
     </div>
     <div style="display:flex; gap:0.5rem; margin-top:1rem;">
       <button class="btn" onclick="addActivityForDay('${dateStr}')">Add</button>
@@ -1284,6 +1299,7 @@ function calculateNext(act) {
   const next = new Date(last);
   if (act.recurrence === 'daily') next.setDate(next.getDate() + 1);
   else if (act.recurrence === 'alternate') next.setDate(next.getDate() + 2);
+  else if (act.recurrence === 'every3') next.setDate(next.getDate() + 3);
   else if (act.recurrence === 'weekly') next.setDate(next.getDate() + 7);
   else if (act.recurrence === 'monthly') next.setMonth(next.getMonth() + 1);
   return next;
