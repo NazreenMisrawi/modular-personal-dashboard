@@ -298,6 +298,7 @@ function renderAquariumConcept(dash) {
         return rows.length ? rows.join('') : '<div class="empty-state">No data recorded</div>';
       })()}
       <button class="btn" style="margin-top:0.75rem" onclick="showWaterTestModal()">Log Water Test</button>
+      <button class="btn-small btn-secondary" style="margin-top:0.5rem; margin-left:0.5rem;" onclick="if(confirm('Clear all water test data?')) clearWaterTestData()">Clear Data</button>
     </div>
 
     <div class="section-title">This week's activities</div>
@@ -315,7 +316,7 @@ function renderAquariumConcept(dash) {
           <span class="label">${label}</span>
           <div class="num">${dayNums[i]}</div>
           <div style="display:flex; flex-direction:column; gap:0.25rem; margin-top:0.35rem; width:100%;">
-            ${dayActs.map(a => `<span class="badge" style="font-size:0.65rem; text-align:center;">${a.name}</span>`).join('')}
+            ${dayActs.map(a => `<span class="badge ${isCompletedToday(a) ? 'completed' : ''}" style="font-size:0.65rem; text-align:center;">${a.name}</span>`).join('')}
           </div>
         </div>`;
       }).join('')}
@@ -445,7 +446,7 @@ function renderWidget(dash, widget, idx) {
         content = dash.activities.map(a => `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem">
             <span>${a.name} (${a.recurrence || 'once'})</span>
-            <button class="btn-small" onclick="completeActivity('${a.id}')">Complete Task</button>
+            <button class="btn-small ${isCompletedToday(a) ? 'completed' : ''}" onclick="completeActivity('${a.id}')">${isCompletedToday(a) ? 'Task Completed' : 'Complete Task'}</button>
           </div>
         `).join('') || '<div class="empty-state">No activities</div>';
       }
@@ -786,6 +787,17 @@ function updateActivity(id, key, value) {
   }
 }
 
+function clearWaterTestData() {
+  const dash = state.dashboards.find(d => d.name.toLowerCase().includes('aquarium'));
+  if (!dash) return;
+  const waterMetrics = ['Temperature','pH','Ammonia','Nitrite','Nitrate','TDS','GH','KH'];
+  dash.metrics.forEach(m => {
+    if (waterMetrics.includes(m.name)) m.history = [];
+  });
+  saveState();
+  render();
+}
+
 function logWaterTest(e) {
   e.preventDefault();
   const form = e.target;
@@ -819,10 +831,18 @@ function completeActivity(id, dashId) {
   if (!dash) return;
   const act = dash.activities.find(a => a.id === id);
   if (act) {
-    act.history.push({ date: new Date().toISOString(), completed: true });
+    const today = new Date().toISOString().slice(0, 10);
+    if (!act.history.some(h => h.date.startsWith(today))) {
+      act.history.push({ date: new Date().toISOString(), completed: true });
+    }
     saveState();
     render();
   }
+}
+
+function isCompletedToday(act) {
+  const today = new Date().toISOString().slice(0, 10);
+  return act.history.some(h => h.date.startsWith(today) && h.completed);
 }
 
 function showAddMetric() {
@@ -1153,6 +1173,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('sidebar-toggle').addEventListener('click', () => {
+    document.getElementById('sidebar').classList.toggle('open');
+  });
+  document.getElementById('mobile-menu-btn').addEventListener('click', () => {
     document.getElementById('sidebar').classList.toggle('open');
   });
   document.getElementById('modal-close').addEventListener('click', closeModal);
