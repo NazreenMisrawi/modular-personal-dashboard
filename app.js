@@ -277,7 +277,10 @@ function renderAquariumConcept(dash) {
 
     <div class="section-title">Equipment status</div>
     <div class="card">
-      <h4 style="margin-bottom:0.75rem">Lighting Schedule</h4>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <h4>Lighting Schedule</h4>
+        <button class="btn-small" style="background:var(--accent);color:#000;" onclick="document.querySelector('[data-widget] .btn-small')?.click() || alert('Scroll down to Additional Widgets and click Edit on Lighting Schedule')">Edit</button>
+      </div>
       <div class="chart-container" style="height:160px"><canvas id="lighting-chart"></canvas></div>
       <div style="margin-top:1rem">
         <h4>CO2</h4>
@@ -364,8 +367,8 @@ function getWidgetTitle(w) {
 function renderWidget(dash, widget, idx) {
   const editing = isEditing(widget.id);
   const header = `<div class="widget-header"><h3>${getWidgetTitle(widget)}</h3>
-    <div>
-      ${!editing ? `<button class="btn-small btn-secondary" onclick="toggleEditWidget('${widget.id}')">Edit</button>` : ''}
+    <div style="display:flex; gap:0.25rem; align-items:center;">
+      ${!editing ? `<button class="btn-small" style="background:var(--accent);color:#000;" onclick="toggleEditWidget('${widget.id}')">Edit</button>` : ''}
       <button class="icon-btn" onclick="moveWidget(${idx}, -1)">↑</button>
       <button class="icon-btn" onclick="moveWidget(${idx}, 1)">↓</button>
       <button class="icon-btn" onclick="removeWidget('${widget.id}')">×</button>
