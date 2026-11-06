@@ -273,19 +273,28 @@ th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--borde
   .sidebar { position: fixed; height: 100%; transform: translateX(-100%); z-index: 150; }
   .sidebar.open { transform: translateX(0); }
   .mobile-only { display: block; }
-  #main-content { padding: 3.5rem 0.75rem 1rem; }
+  #main-content { padding: 3.5rem 0.5rem 1rem; }
   .grid { grid-template-columns: 1fr; }
-  .metrics-row { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-  .metric-card { padding: 0.75rem; }
-  .metric-card .value { font-size: 1.3rem; }
-  .week-days { gap: 0.15rem; }
-  .day-circle .num { width: 28px; height: 28px; font-size: 0.75rem; }
-  .day-circle .label { font-size: 0.6rem; }
-  .dashboard-header { flex-wrap: wrap; gap: 0.5rem; }
-  .dashboard-title { font-size: 1.2rem; }
-  .section-title { font-size: 1rem; margin: 1rem 0 0.5rem; }
-  .card { padding: 0.75rem; }
-  .chart-container { height: 140px; }
-  .upcoming-card { padding: 0.75rem; }
-  .btn, .btn-small { font-size: 0.75rem; padding: 0.3rem 0.6rem; }
+  .metrics-row { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+  .metric-card { padding: 0.6rem; }
+  .metric-card .value { font-size: 1.2rem; }
+  .week-days { 
+    display: grid; 
+    grid-template-columns: repeat(5, 1fr); 
+    gap: 0.3rem; 
+  }
+  .week-days .day-circle:nth-child(6),
+  .week-days .day-circle:nth-child(7) {
+    grid-column: span 1;
+  }
+  .day-circle .num { width: 26px; height: 26px; font-size: 0.7rem; }
+  .day-circle .label { font-size: 0.55rem; }
+  .dashboard-header { flex-wrap: wrap; gap: 0.4rem; }
+  .dashboard-title { font-size: 1.1rem; }
+  .section-title { font-size: 0.95rem; margin: 0.75rem 0 0.4rem; }
+  .card { padding: 0.6rem; }
+  .chart-container { height: 120px; }
+  .upcoming-card { padding: 0.6rem; }
+  .btn, .btn-small { font-size: 0.7rem; padding: 0.25rem 0.5rem; }
+  .badge { font-size: 0.6rem; padding: 0.15rem 0.4rem; }
 }
