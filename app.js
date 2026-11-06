@@ -56,7 +56,13 @@ function seedInitialData() {
       filter: 'Sicce Shark Mini Skim 350',
       lighting: 'Red Aquatics Ultra Nano RGB Pro',
       co2: 'Chihiros Mini CO2 Kit with solenoid',
-      tempTarget: '25–27°C'
+      tempTarget: '25–27°C',
+      co2Schedule: { on: '09:00', off: '19:00', lastChange: '' },
+      lightingSchedule: [
+        { window: 'Morning', on: '08:00', off: '12:00', intensity: '50%' },
+        { window: 'Afternoon', on: '12:00', off: '18:00', intensity: '100%' },
+        { window: 'Evening', on: '18:00', off: '22:00', intensity: '30%' }
+      ]
     },
     metrics: [
       { id: generateId(), name: 'Temperature', unit: '°C', type: 'number', category: 'Water', target: 26, history: [] },
@@ -83,6 +89,8 @@ function seedInitialData() {
       { id: generateId(), type: 'config' },
       { id: generateId(), type: 'metrics-overview' },
       { id: generateId(), type: 'water-test' },
+      { id: generateId(), type: 'co2-schedule' },
+      { id: generateId(), type: 'lighting-schedule' },
       { id: generateId(), type: 'activities' },
       { id: generateId(), type: 'chart', metricName: 'Temperature' },
       { id: generateId(), type: 'chart', metricName: 'pH' }
@@ -396,8 +404,104 @@ function renderWidget(dash, widget, idx) {
 }
 
 function getWidgetTitle(w) {
-  const titles = { config: 'Equipment Config', 'metrics-overview': 'Metrics', 'water-test': 'Water Testing', activities: 'Schedules & Tasks', chart: w.metricName + ' Chart' };
+  const titles = {
+    config: 'Equipment Config',
+    'metrics-overview': 'Metrics',
+    'water-test': 'Water Testing',
+    activities: 'Schedules & Tasks',
+    chart: w.metricName + ' Chart',
+    'co2-schedule': 'CO2 Schedule',
+    'lighting-schedule': 'Lighting Schedule'
+  };
   return titles[w.type] || w.type;
+}
+
+function renderWidget(dash, widget, idx) {
+  let content = '';
+  const header = `<div class="widget-header"><h3>${getWidgetTitle(widget)}</h3>
+    <div>
+      <button class="icon-btn" onclick="moveWidget(${idx}, -1)">↑</button>
+      <button class="icon-btn" onclick="moveWidget(${idx}, 1)">↓</button>
+      <button class="icon-btn" onclick="removeWidget('${widget.id}')">×</button>
+    </div></div>`;
+
+  switch (widget.type) {
+    case 'config':
+      content = `<div class="form-group"><label>Tank</label><input value="${dash.config.tank || ''}" onchange="updateConfig('tank', this.value)"></div>
+        <div class="form-group"><label>Filter</label><input value="${dash.config.filter || ''}" onchange="updateConfig('filter', this.value)"></div>
+        <div class="form-group"><label>Lighting</label><input value="${dash.config.lighting || ''}" onchange="updateConfig('lighting', this.value)"></div>
+        <div class="form-group"><label>CO2</label><input value="${dash.config.co2 || ''}" onchange="updateConfig('co2', this.value)"></div>
+        <div class="form-group"><label>Temp Target</label><input value="${dash.config.tempTarget || ''}" onchange="updateConfig('tempTarget', this.value)"></div>`;
+      break;
+    case 'metrics-overview':
+      content = dash.metrics.map(m => {
+        const last = m.history[m.history.length - 1];
+        return `<div style="margin-bottom:0.5rem"><strong>${m.name}</strong> <span class="metric-value">${last ? last.value : '—'}</span> ${m.unit || ''}</div>`;
+      }).join('') || '<div class="empty-state">No metrics</div>';
+      content += `<button class="btn-small" onclick="showAddMetric()">+ Metric</button>`;
+      break;
+    case 'water-test':
+      content = `<form onsubmit="logWaterTest(event)">
+        <div class="form-group"><label>Date</label><input type="date" name="date" value="${new Date().toISOString().slice(0,10)}" required></div>
+        <div class="form-group"><label>Temperature</label><input type="number" step="0.1" name="temp" placeholder="optional"></div>
+        <div class="form-group"><label>pH</label><input type="number" step="0.1" name="ph" placeholder="optional"></div>
+        <div class="form-group"><label>Ammonia</label><input type="number" step="0.01" name="ammonia" placeholder="optional"></div>
+        <div class="form-group"><label>Nitrite</label><input type="number" step="0.01" name="nitrite" placeholder="optional"></div>
+        <div class="form-group"><label>Nitrate</label><input type="number" step="0.1" name="nitrate" placeholder="optional"></div>
+        <div class="form-group"><label>TDS</label><input type="number" name="tds" placeholder="optional"></div>
+        <div class="form-group"><label>GH</label><input type="number" step="0.5" name="gh" placeholder="optional"></div>
+        <div class="form-group"><label>KH</label><input type="number" step="0.5" name="kh" placeholder="optional"></div>
+        <div class="form-group"><label>Notes</label><textarea name="notes"></textarea></div>
+        <button type="submit" class="btn">Log Test</button>
+      </form>`;
+      break;
+    case 'activities':
+      content = dash.activities.map(a => `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem">
+          <span>${a.name} (${a.recurrence || 'once'})</span>
+          <div>
+            <button class="btn-small" onclick="completeActivity('${a.id}')">Complete</button>
+            <button class="btn-small btn-danger" onclick="removeActivity('${a.id}')">×</button>
+          </div>
+        </div>
+      `).join('') || '<div class="empty-state">No activities</div>';
+      content += `<button class="btn-small" onclick="showAddActivity()">+ Activity</button>`;
+      break;
+    case 'chart':
+      const metric = dash.metrics.find(m => m.name === widget.metricName);
+      content = metric && metric.history.length ? `<div class="chart-container"><canvas id="chart-${widget.id}"></canvas></div>` : '<div class="empty-state">No data recorded</div>';
+      break;
+    case 'co2-schedule':
+      const co2 = dash.config.co2Schedule || { on: '09:00', off: '19:00', lastChange: '' };
+      content = `
+        <div class="form-group"><label>ON time</label><input type="time" value="${co2.on}" onchange="updateCo2Schedule('on', this.value)"></div>
+        <div class="form-group"><label>OFF time</label><input type="time" value="${co2.off}" onchange="updateCo2Schedule('off', this.value)"></div>
+        <div class="form-group"><label>Last cartridge change</label><input type="date" value="${co2.lastChange}" onchange="updateCo2Schedule('lastChange', this.value)"></div>
+        <p style="margin-top:0.5rem;color:var(--text-muted);font-size:0.9rem;">Current: ${co2.on} – ${co2.off}</p>
+      `;
+      break;
+    case 'lighting-schedule':
+      const lights = dash.config.lightingSchedule || [
+        { window: 'Morning', on: '08:00', off: '12:00', intensity: '50%' },
+        { window: 'Afternoon', on: '12:00', off: '18:00', intensity: '100%' },
+        { window: 'Evening', on: '18:00', off: '22:00', intensity: '30%' }
+      ];
+      content = lights.map((l, i) => `
+        <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap;">
+          <input style="width:100px" value="${l.window}" onchange="updateLightingWindow(${i}, 'window', this.value)" placeholder="Window">
+          <input type="time" value="${l.on}" onchange="updateLightingWindow(${i}, 'on', this.value)">
+          <span>–</span>
+          <input type="time" value="${l.off}" onchange="updateLightingWindow(${i}, 'off', this.value)">
+          <input style="width:70px" value="${l.intensity}" onchange="updateLightingWindow(${i}, 'intensity', this.value)" placeholder="%">
+          <button class="btn-small btn-danger" onclick="removeLightingWindow(${i})">×</button>
+        </div>
+      `).join('') || '<div class="empty-state">No lighting windows</div>';
+      content += `<button class="btn-small" onclick="addLightingWindow()">+ Window</button>`;
+      break;
+    default:
+      content = '<div class="empty-state">Widget</div>';
+  }
+  return `<div class="card" data-widget="${widget.id}">${header}${content}</div>`;
 }
 
 function renderCharts(dash) {
@@ -534,9 +638,49 @@ function createDashboard() {
   openDashboard(id);
 }
 
-function updateConfig(key, value) {
+function updateCo2Schedule(key, value) {
   const dash = getCurrentDash();
-  if (dash) { dash.config[key] = value; saveState(); }
+  if (!dash) return;
+  if (!dash.config.co2Schedule) dash.config.co2Schedule = { on: '09:00', off: '19:00', lastChange: '' };
+  dash.config.co2Schedule[key] = value;
+  saveState();
+  render();
+}
+
+function updateLightingWindow(idx, key, value) {
+  const dash = getCurrentDash();
+  if (!dash) return;
+  if (!dash.config.lightingSchedule) dash.config.lightingSchedule = [];
+  if (dash.config.lightingSchedule[idx]) {
+    dash.config.lightingSchedule[idx][key] = value;
+    saveState();
+    render();
+  }
+}
+
+function addLightingWindow() {
+  const dash = getCurrentDash();
+  if (!dash) return;
+  if (!dash.config.lightingSchedule) dash.config.lightingSchedule = [];
+  dash.config.lightingSchedule.push({ window: 'New', on: '08:00', off: '12:00', intensity: '50%' });
+  saveState();
+  render();
+}
+
+function removeLightingWindow(idx) {
+  const dash = getCurrentDash();
+  if (!dash || !dash.config.lightingSchedule) return;
+  dash.config.lightingSchedule.splice(idx, 1);
+  saveState();
+  render();
+}
+
+function removeActivity(id) {
+  const dash = getCurrentDash();
+  if (!dash) return;
+  dash.activities = dash.activities.filter(a => a.id !== id);
+  saveState();
+  render();
 }
 
 function logWaterTest(e) {
@@ -633,6 +777,8 @@ function showAddWidget() {
         <option value="metrics-overview">Metrics Overview</option>
         <option value="activities">Activities</option>
         <option value="chart">Chart (select metric)</option>
+        <option value="co2-schedule">CO2 Schedule</option>
+        <option value="lighting-schedule">Lighting Schedule</option>
         <option value="notes">Notes</option>
       </select>
     </div>
