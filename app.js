@@ -4,7 +4,7 @@
 const STORAGE_KEY = 'modularDashboardData_v1';
 const SUPABASE_URL = 'https://lmkovkianhwzjgaajxca.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__IPAAWNqWmoMftlvy35sHQ_DFSTSWgB';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 let currentUser = null;
 
@@ -116,12 +116,18 @@ function applyTheme() {
 
 // ===== AUTH & SUPABASE =====
 async function initAuth() {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) {
-    currentUser = session.user;
-    await loadFromSupabase();
-    render();
-  } else {
+  if (!supabase) { showLogin(); return; }
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      currentUser = session.user;
+      await loadFromSupabase();
+      render();
+    } else {
+      showLogin();
+    }
+  } catch (err) {
+    console.error('Auth init failed', err);
     showLogin();
   }
 }
