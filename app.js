@@ -286,6 +286,19 @@ function renderAquariumConcept(dash) {
       <div><strong>OFF:</strong> ${(dash.config.co2Schedule||{}).off || '—'}</div>
       <div><strong>Last cartridge change:</strong> ${(dash.config.co2Schedule||{}).lastChange || 'Not recorded'}</div>
     </div>
+    <div class="card">
+      <h4 style="margin-bottom:0.75rem">Latest Water Test</h4>
+      ${(() => {
+        const params = ['Temperature','pH','Ammonia','Nitrite','Nitrate','TDS','GH','KH'];
+        const rows = params.map(name => {
+          const m = dash.metrics.find(x => x.name === name);
+          const last = m && m.history.length ? m.history[m.history.length-1] : null;
+          return last ? `<div><strong>${name}:</strong> ${last.value} ${m.unit||''} <span style="color:var(--text-muted);font-size:0.8rem;">(${last.date})</span></div>` : '';
+        }).filter(Boolean);
+        return rows.length ? rows.join('') : '<div class="empty-state">No data recorded</div>';
+      })()}
+      <button class="btn" style="margin-top:0.75rem" onclick="showWaterTestModal()">Log Water Test</button>
+    </div>
 
     <div class="section-title">This week's activities</div>
     <div class="week-days">
@@ -325,7 +338,6 @@ function renderAquariumConcept(dash) {
     </div>
 
     <div style="margin-top:1.5rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
-      <button class="btn" onclick="showWaterTestModal()">Log Water Test</button>
       <button class="btn-secondary btn" onclick="showAddWidget()">+ Widget</button>
       <button class="btn-secondary btn" onclick="state.currentView='dashboards'; render()">Back</button>
     </div>
@@ -333,7 +345,7 @@ function renderAquariumConcept(dash) {
     <!-- Existing widgets still available below for full modular access -->
     <div class="section-title" style="margin-top:2rem;">Additional Widgets</div>
     <div class="grid">
-      ${dash.widgets.filter(w => w.type !== 'metrics-overview').map((w, idx) => renderWidget(dash, w, idx)).join('')}
+      ${dash.widgets.filter(w => w.type !== 'metrics-overview' && w.type !== 'water-test').map((w, idx) => renderWidget(dash, w, idx)).join('')}
     </div>
   `;
 }
@@ -353,7 +365,10 @@ function showWaterTestModal() {
       <div class="form-group"><label>GH</label><input type="number" step="0.5" name="gh" placeholder="optional"></div>
       <div class="form-group"><label>KH</label><input type="number" step="0.5" name="kh" placeholder="optional"></div>
       <div class="form-group"><label>Notes</label><textarea name="notes"></textarea></div>
-      <button type="submit" class="btn">Log Test</button>
+      <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+        <button type="submit" class="btn">Log Test</button>
+        <button type="button" class="btn-secondary btn" onclick="closeModal()">Cancel</button>
+      </div>
     </form>
   `);
 }
@@ -514,7 +529,7 @@ function renderLightingChart(dash) {
   if (!lights.length) return;
   if (charts['lighting']) charts['lighting'].destroy();
   charts['lighting'] = new Chart(ctx, {
-    type: 'bar',
+    type: 'line',
     data: {
       labels: lights.map(l => l.window),
       datasets: [{
@@ -524,7 +539,11 @@ function renderLightingChart(dash) {
           const off = l.off.split(':').map(Number);
           return (off[0] + off[1]/60) - (on[0] + on[1]/60);
         }),
-        backgroundColor: '#26c6da'
+        borderColor: '#26c6da',
+        backgroundColor: 'rgba(38,198,218,0.15)',
+        tension: 0.3,
+        fill: true,
+        pointRadius: 4
       }]
     },
     options: {
@@ -783,7 +802,10 @@ function logWaterTest(e) {
     if (val) {
       const metric = dash.metrics.find(m => m.name === nameMap[p]);
       if (metric) {
-        metric.history.push({ date, value: parseFloat(val), notes });
+        const existingIdx = metric.history.findIndex(h => h.date === date);
+        const entry = { date, value: parseFloat(val), notes };
+        if (existingIdx >= 0) metric.history[existingIdx] = entry;
+        else metric.history.push(entry);
       }
     }
   });
